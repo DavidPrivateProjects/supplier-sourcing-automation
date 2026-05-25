@@ -27,6 +27,7 @@ const Processing = () => {
     status: "processing",
     progress: 0,
     message: "Initializing AI agents...",
+    timestamp: new Date().toISOString(),
   });
 
   useEffect(() => {
@@ -42,6 +43,7 @@ const Processing = () => {
         status: "processing",
         progress: 10,
         message: "Analyzing your requirements and preparing search...",
+        timestamp: new Date().toISOString(),
       });
       return;
     }

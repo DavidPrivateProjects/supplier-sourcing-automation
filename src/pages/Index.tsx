@@ -7,11 +7,11 @@ const Index = () => {
         {/* Header */}
         <header className="mb-12 text-center">
           <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-            Find Your Ideal Suppliers
+            Supplier discovery with reusable intelligence
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-            Share your requirements and let us connect you with qualified suppliers. 
-            Simple, fast, and tailored to your needs.
+            Capture sourcing requirements once, compare against prior investigations,
+            enrich supplier data, and surface a contact-ready shortlist.
           </p>
         </header>
 
@@ -22,7 +22,7 @@ const Index = () => {
 
         {/* Footer Note */}
         <p className="mt-8 text-center text-sm text-muted-foreground">
-          We'll review your requirements and match you with vetted suppliers within 24-48 hours.
+          Designed to reduce manual research while preserving a clear audit trail for the buying team.
         </p>
       </div>
     </div>

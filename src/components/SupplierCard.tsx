@@ -3,23 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Mail, Phone, Globe, MapPin, MessageSquare } from "lucide-react";
 import { useState } from "react";
-
-interface ConversationTurn {
-  role: string;
-  content: string;
-  timestamp: string;
-}
-
-interface Supplier {
-  name: string;
-  contact_email: string;
-  contact_phone: string;
-  website: string;
-  location: string;
-  match_score: number;
-  capabilities: string[];
-  conversation_log: ConversationTurn[];
-}
+import type { Supplier } from "@/lib/api";
 
 interface SupplierCardProps {
   supplier: Supplier;
@@ -27,6 +11,13 @@ interface SupplierCardProps {
 
 export function SupplierCard({ supplier }: SupplierCardProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const conversationLog = supplier.conversation_log ?? [];
+
+  const roleLabel = (role: string) => {
+    if (role === "buyer") return "Buyer outreach";
+    if (role === "supplier") return "Supplier reply";
+    return "System insight";
+  };
 
   return (
     <Card className="transition-shadow hover:shadow-md">
@@ -85,22 +76,22 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
           <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">
             <span className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
-              Conversation Log ({supplier.conversation_log.length} messages)
+              Contact Validation ({conversationLog.length} messages)
             </span>
             <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
             <div className="space-y-3 rounded-lg border border-border bg-card p-4">
-              {supplier.conversation_log.map((turn, index) => (
+              {conversationLog.map((turn, index) => (
                 <div key={index} className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-semibold ${turn.role === "assistant" ? "text-primary" : "text-muted-foreground"}`}>
-                      {turn.role === "assistant" ? "AI Agent" : "System"}
+                    <span className={`text-xs font-semibold ${turn.role === "system" ? "text-primary" : "text-muted-foreground"}`}>
+                      {roleLabel(turn.role)}
                     </span>
                     <span className="text-xs text-muted-foreground">{turn.timestamp}</span>
                   </div>
                   <p className="text-sm text-foreground">{turn.content}</p>
-                  {index < supplier.conversation_log.length - 1 && <div className="mt-3 h-px bg-border" />}
+                  {index < conversationLog.length - 1 && <div className="mt-3 h-px bg-border" />}
                 </div>
               ))}
             </div>

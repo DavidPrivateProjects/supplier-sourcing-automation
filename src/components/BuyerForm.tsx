@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { submitRequirement } from "@/lib/api";
 import {
   Select,
   SelectContent,
@@ -75,7 +76,6 @@ export function BuyerForm() {
     setIsLoading(true);
 
     try {
-      // Map form fields to backend schema
       const payload = {
         companyName: values.companyName,
         contactName: values.contactName,
@@ -87,42 +87,37 @@ export function BuyerForm() {
         timeline: values.timeline,
         specifications: values.specifications || "",
       };
-
-      console.log("Sending request to backend:", payload);
       
-      // Generate temporary ID for immediate navigation
       const tempId = `temp_${Date.now()}`;
       
-      // Navigate to processing page immediately to show progress
       navigate("/processing", { 
         state: { 
           investigation_id: tempId,
           isProcessing: true
         } 
       });
-      
-      // Continue backend request in background
-      const response = await fetch("http://localhost:8000/api/v1/requirements", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const data = await submitRequirement(payload);
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+      if (data.status === "completed" && data.suppliers.length > 0) {
+        navigate("/results", {
+          state: {
+            investigation_id: data.investigation_id,
+            cached: data.cached,
+            suppliers: data.suppliers,
+            timestamp: data.timestamp,
+            message: data.message,
+          },
+          replace: true,
+        });
+        form.reset();
+        return;
       }
 
-      const data = await response.json();
-      console.log("Backend response:", data);
-
-      // Update the processing page with real investigation ID
       navigate("/processing", { 
         state: { 
           investigation_id: data.investigation_id,
           isProcessing: false,
-          cached: data.cached
+          cached: data.cached,
         },
         replace: true
       });
@@ -130,8 +125,7 @@ export function BuyerForm() {
       form.reset();
     } catch (error) {
       console.error("Error submitting requirements:", error);
-      toast.error("Failed to submit requirements. Please ensure the backend is running on localhost:8000");
-      // Navigate back to form on error
+      toast.error("Failed to submit requirements. Please ensure the backend is running.");
       navigate("/", { replace: true });
     } finally {
       setIsLoading(false);

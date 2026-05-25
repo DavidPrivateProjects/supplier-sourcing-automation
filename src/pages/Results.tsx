@@ -1,30 +1,16 @@
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, Clock, Database, Target } from "lucide-react";
 import { SupplierCard } from "@/components/SupplierCard";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import { useEffect } from "react";
-
-interface ConversationTurn {
-  role: string;
-  content: string;
-  timestamp: string;
-}
-
-interface Supplier {
-  name: string;
-  contact_email: string;
-  contact_phone: string;
-  website: string;
-  location: string;
-  match_score: number;
-  capabilities: string[];
-  conversation_log: ConversationTurn[];
-}
+import type { Supplier } from "@/lib/api";
 
 interface ResultsData {
   investigation_id: string;
   cached: boolean;
   suppliers: Supplier[];
+  message?: string;
+  timestamp?: string;
 }
 
 const Results = () => {
@@ -42,9 +28,8 @@ const Results = () => {
     return null;
   }
 
-  const { investigation_id, cached, suppliers } = resultsData;
+  const { investigation_id, cached, suppliers, message, timestamp } = resultsData;
 
-  // Check if suppliers exist and has data
   if (!suppliers || suppliers.length === 0) {
     return (
       <div className="min-h-screen bg-background">
@@ -68,10 +53,13 @@ const Results = () => {
     );
   }
 
+  const averageScore = Math.round(
+    suppliers.reduce((total, supplier) => total + supplier.match_score, 0) / suppliers.length
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-6 py-12 md:py-20">
-        {/* Header */}
         <div className="mb-8">
           <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 -ml-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -94,31 +82,45 @@ const Results = () => {
           <p className="text-lg text-muted-foreground">
             We've matched you with {suppliers.length} qualified supplier{suppliers.length !== 1 ? "s" : ""} based on your requirements.
           </p>
+          {message && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {message}
+            </p>
+          )}
         </div>
 
-        {/* Supplier Cards Grid */}
+        <div className="mb-8 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <Target className="mb-3 h-5 w-5 text-primary" />
+            <p className="text-2xl font-semibold">{averageScore}%</p>
+            <p className="text-sm text-muted-foreground">Average fit score across returned suppliers</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <Database className="mb-3 h-5 w-5 text-primary" />
+            <p className="text-2xl font-semibold">{cached ? "Reused" : "Fresh"}</p>
+            <p className="text-sm text-muted-foreground">Result source for faster repeat sourcing</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <Clock className="mb-3 h-5 w-5 text-primary" />
+            <p className="text-2xl font-semibold">Ready</p>
+            <p className="text-sm text-muted-foreground">
+              {timestamp ? `Generated ${new Date(timestamp).toLocaleString()}` : "Generated for review"}
+            </p>
+          </div>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-          {suppliers.map((supplier, index) => {
-            // Calculate display score: 95% for first, 90% for second, 86% for third, then decreasing by 4%
-            let displayScore: number;
-            if (index === 0) displayScore = 95;
-            else if (index === 1) displayScore = 90;
-            else if (index === 2) displayScore = 86;
-            else displayScore = Math.max(50, 86 - (index - 2) * 4);
-            
-            return (
-              <SupplierCard 
-                key={index} 
-                supplier={{ ...supplier, match_score: displayScore }} 
-              />
-            );
-          })}
+          {suppliers.map((supplier) => (
+            <SupplierCard
+              key={`${supplier.name}-${supplier.contact_email}`}
+              supplier={supplier}
+            />
+          ))}
         </div>
 
-        {/* Footer */}
         <div className="mt-12 rounded-2xl border border-border bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Our team will review these matches and reach out to coordinate next steps within 24-48 hours.
+            Review the shortlist, validate commercial terms, and use the captured contact path for fast follow-up.
           </p>
         </div>
       </div>

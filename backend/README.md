@@ -1,66 +1,48 @@
-# Tacto Track Backend
+# Supplier Scout Backend
 
-A production-ready FastAPI backend for intelligent supplier sourcing automation. Uses vector search, web enrichment, and AI-powered conversations to match buyers with suppliers.
+FastAPI service for supplier discovery, enrichment, contact validation, scoring, and reusable investigation storage.
 
-## Features
+## Highlights
 
-- **Smart Caching**: Vector similarity search finds existing investigations (distance ≤ 0.5)
-- **Web Enrichment**: EXA API discovers suppliers with contact information
-- **AI Conversations**: OpenAI simulates buyer-supplier email exchanges
-- **Persistent Storage**: Weaviate stores and retrieves investigation results
-- **Status Tracking**: Real-time progress monitoring for investigations
+- **Runs with or without external credentials:** deterministic demo data keeps the app usable locally.
+- **Typed API contracts:** Pydantic models validate requests and responses.
+- **Reusable investigations:** Weaviate vector search can return similar prior work before new enrichment starts.
+- **Supplier enrichment:** EXA Websets can discover supplier candidates and contact evidence.
+- **Contact validation:** OpenAI can extract the right commercial contact from supplier replies.
+- **Operational visibility:** `/health` reports which integrations are configured.
 
-## Quick Start
-
-### 1. Environment Variables
-
-Create a `.env` file in the backend directory:
-
-```bash
-WEAVIATE_URL=your_weaviate_cluster_url
-WEAVIATE_API_KEY=your_weaviate_api_key
-EXA_API_KEY=your_exa_api_key
-OPENAI_API_KEY=your_openai_api_key
-```
-
-### 2. Setup Python Environment
+## Setup
 
 ```bash
 cd backend
-python -m venv venv
-
-# Activate virtual environment:
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-```
-
-### 3. Install Dependencies
-
-```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. Run the Server
+Leave optional credentials blank to use the deterministic demo workflow.
 
-```bash
-# Development mode (with auto-reload)
-uvicorn main:app --reload --port 8000
+## Environment variables
 
-# Or simply:
-python main.py
-```
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `ALLOWED_ORIGINS` | No | Comma-separated frontend origins for CORS |
+| `SIMILARITY_DISTANCE` | No | Weaviate distance threshold for cache reuse |
+| `EXA_WAIT_SECONDS` | No | Wait time before collecting EXA Websets results |
+| `WEAVIATE_URL` | No | Enables vector lookup and persistence |
+| `WEAVIATE_API_KEY` | No | Authenticates Weaviate Cloud |
+| `EXA_API_KEY` | No | Enables live supplier enrichment |
+| `OPENAI_API_KEY` | No | Enables AI-assisted contact extraction |
+| `OPENAI_MODEL` | No | Defaults to `gpt-4o-mini` |
 
-The API will be available at `http://localhost:8000`
+## Endpoints
 
-## API Endpoints
+### `POST /api/v1/requirements`
 
-### POST `/api/v1/requirements`
+Submit buyer requirements and receive supplier matches.
 
-Submit buyer requirements and receive supplier matches. The system first checks for similar investigations in the vector database. If found (similarity distance ≤ 0.5), returns cached results instantly. Otherwise, initiates a new investigation using EXA web enrichment and AI conversations.
-
-**Request Body:**
 ```json
 {
   "companyName": "Acme Manufacturing",
@@ -71,65 +53,53 @@ Submit buyer requirements and receive supplier matches. The system first checks 
   "quantity": "1000 units",
   "budgetRange": "$10,000 - $25,000",
   "timeline": "3 months",
-  "specifications": "Operating range: -40°C to 125°C, Digital I2C interface, IP67 rated housing"
+  "specifications": "Operating range: -40C to 125C, Digital I2C interface, IP67 rated housing"
 }
 ```
 
-**Response (200 OK - Cached):**
-```json
-{
-  "investigation_id": "uuid-here",
-  "cached": true,
-  "status": "completed",
-  "message": "Similar investigation found. Returning cached results.",
-  "suppliers": [...],
-  "timestamp": "2025-10-25T14:30:22.123456"
-}
-```
+Example response:
 
-**Response (200 OK - New Investigation):**
 ```json
 {
-  "investigation_id": "uuid-here",
+  "investigation_id": "inv_5fdd3f02-4d1e-4938-96e2-2d18f9b906cb",
   "cached": false,
-  "status": "processing",
-  "message": "New investigation started. Use /status endpoint to track progress.",
-  "suppliers": [...],
-  "timestamp": "2025-10-25T14:30:22.123456"
+  "status": "completed",
+  "message": "Demo supplier set generated because live enrichment is not configured. Contact validation and scoring are ready for review.",
+  "suppliers": [
+    {
+      "name": "Atlas Precision Manufacturing",
+      "contact_email": "sales-industrial-temperature-sensors@atlasprecision.example.com",
+      "contact_phone": "+49 89 0000 0000",
+      "website": "https://atlasprecision.example.com",
+      "location": "Germany",
+      "match_score": 94,
+      "capabilities": ["Technical qualification", "Capacity screening", "Commercial follow-up"],
+      "conversation_log": []
+    }
+  ],
+  "timestamp": "2026-05-25T13:52:00+00:00"
 }
 ```
 
-### GET `/api/v1/investigations/{investigation_id}/status`
+### `GET /api/v1/investigations/{investigation_id}/status`
 
-Check the status of an ongoing or completed investigation.
+Returns completed investigation details from in-memory demo storage or Weaviate.
 
-**Response:**
-```json
-{
-  "investigation_id": "uuid-here",
-  "status": "processing" | "completed" | "failed",
-  "progress": 65,
-  "message": "Analyzing supplier responses...",
-  "suppliers": [...],
-  "timestamp": "2025-10-25T14:30:22.123456"
-}
+### `GET /health`
+
+Returns service health and configured integration flags.
+
+## Initialize Weaviate
+
+When using live vector search, create the collection once:
+
+```bash
+python create_collection.py
 ```
 
-### GET `/health`
+The script is idempotent and exits without changing an existing collection.
 
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-10-25T14:30:22.123456"
-}
-```
-
-## Testing
-
-Use the included test file:
+## Manual API check
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/requirements \
@@ -137,52 +107,19 @@ curl -X POST http://localhost:8000/api/v1/requirements \
   -d @test_request.json
 ```
 
-Or visit the interactive API docs:
+Interactive docs:
+
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-## Project Structure
+## Project structure
 
-```
+```text
 backend/
-├── main.py              # FastAPI app with Weaviate, EXA, OpenAI integration
-├── requirements.txt     # Python dependencies (FastAPI, Weaviate, EXA, OpenAI)
-├── create_collection.py # Weaviate collection initialization script
-├── .env                 # Environment variables (not tracked in git)
-├── test_request.json    # Sample request for testing
-└── README.md           # This file
+├── main.py              # FastAPI app and orchestration workflow
+├── create_collection.py # Weaviate collection setup
+├── requirements.txt     # Python dependencies
+├── test_request.json    # Sample request payload
+├── .env.example         # Local configuration template
+└── README.md
 ```
-
-## How It Works
-
-1. **Request Processing**: Buyer submits requirements via POST endpoint
-2. **Similarity Search**: Checks Weaviate for similar investigations (vector distance ≤ 0.5)
-3. **Cache Hit**: Returns existing suppliers instantly if match found
-4. **Cache Miss**: Initiates new investigation:
-   - EXA API searches web for supplier contacts (~60 seconds)
-   - OpenAI simulates email conversations with suppliers
-   - Results stored in Weaviate for future caching
-5. **Status Tracking**: Frontend polls status endpoint for progress updates
-
-## Performance Notes
-
-- **Cached Results**: ~500ms response time
-- **New Investigations**: ~60-90 seconds (EXA enrichment + AI processing)
-- **Similarity Threshold**: Distance ≤ 0.5 triggers cache hit (adjustable in code)
-
-## Future Enhancements
-
-1. **Email Integration**: Real SMTP for actual supplier outreach
-2. **Advanced Enrichment**: Additional data sources beyond EXA
-3. **ML Scoring**: Train models on successful matches to improve ranking
-4. **Rate Limiting**: Add request throttling for production
-5. **WebSocket Support**: Real-time progress updates instead of polling
-
-## CORS Configuration
-
-CORS is pre-configured for:
-- `http://localhost:5173` (Vite dev server)
-- `http://localhost:3000` (alternative frontend port)
-- `http://localhost:8080` (alternative port)
-
-Update `main.py` to add production origins when deploying.
