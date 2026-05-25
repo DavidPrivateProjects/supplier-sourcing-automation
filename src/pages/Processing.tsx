@@ -1,4 +1,223 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AlertCircle, CheckCircle2, Loader2, MessageSquare, Search } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { fetchInvestigationStatus, type StatusResponse } from "@/lib/api";
+
+interface ProcessingState {
+  investigation_id: string;
+  isProcessing?: boolean;
+  cached?: boolean;
+}
+
+const Processing = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const processingState = location.state as ProcessingState;
+
+  const [status, setStatus] = useState<StatusResponse>({
+    investigation_id: processingState?.investigation_id || "",
+    status: "processing",
+    progress: 0,
+    message: "Initializing AI agents...",
+    timestamp: new Date().toISOString(),
+  });
+
+  useEffect(() => {
+    if (!processingState?.investigation_id) {
+      navigate("/");
+      return;
+    }
+
+    if (processingState.investigation_id.startsWith("temp_")) {
+      setStatus({
+        investigation_id: processingState.investigation_id,
+        status: "processing",
+        progress: 10,
+        message: "Analyzing your requirements and preparing search...",
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    let pollCount = 0;
+    const maxPolls = 40;
+
+    const pollStatus = async () => {
+      try {
+        const data = await fetchInvestigationStatus(processingState.investigation_id);
+        setStatus(data);
+
+        if (data.status === "completed" && data.suppliers) {
+          setTimeout(() => {
+            navigate("/results", {
+              state: {
+                investigation_id: data.investigation_id,
+                cached: processingState.cached || false,
+                suppliers: data.suppliers,
+                timestamp: data.timestamp,
+                message: data.message,
+              },
+            });
+          }, 1500);
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+        setStatus((previous) => ({
+          ...previous,
+          status: "failed",
+          progress: 0,
+          message: "Unable to retrieve status. Check that the backend is running and try again.",
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    };
+
+    const interval = setInterval(() => {
+      pollCount++;
+      pollStatus();
+
+      if (pollCount >= maxPolls) {
+        clearInterval(interval);
+        setStatus((previous) => ({
+          ...previous,
+          message: "Investigation is taking longer than expected. Please check back shortly.",
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    }, 3000);
+
+    pollStatus();
+
+    return () => clearInterval(interval);
+  }, [processingState, navigate]);
+
+  const getStatusIcon = () => {
+    switch (status.status) {
+      case "processing":
+        return <Loader2 className="h-8 w-8 animate-spin text-primary" />;
+      case "searching":
+        return <Search className="h-8 w-8 animate-pulse text-primary" />;
+      case "contacting":
+        return <MessageSquare className="h-8 w-8 animate-pulse text-primary" />;
+      case "completed":
+        return <CheckCircle2 className="h-8 w-8 text-primary" />;
+      case "failed":
+        return <AlertCircle className="h-8 w-8 text-destructive" />;
+      default:
+        return <Loader2 className="h-8 w-8 animate-spin text-primary" />;
+    }
+  };
+
+  const getStatusTitle = () => {
+    switch (status.status) {
+      case "processing":
+        return "Analyzing Your Requirements";
+      case "searching":
+        return "Searching Global Supplier Database";
+      case "contacting":
+        return "AI Agents Contacting Suppliers";
+      case "completed":
+        return "Matches Found!";
+      case "failed":
+        return "Unable to Complete Search";
+      default:
+        return "Processing";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-3xl px-6 py-12 md:py-20">
+        <header className="mb-12 text-center">
+          <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+            Finding Your Perfect Suppliers
+          </h1>
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+            Our AI agents are working to find and validate the best suppliers for your needs.
+          </p>
+        </header>
+
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-sm md:p-12">
+          <div className="space-y-8">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Investigation ID</p>
+              <p className="mt-1 font-mono text-lg font-medium text-foreground">
+                {status.investigation_id}
+              </p>
+            </div>
+
+            <div className="flex justify-center">{getStatusIcon()}</div>
+
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold text-foreground">
+                {getStatusTitle()}
+              </h2>
+              <p className="mt-2 text-muted-foreground">{status.message}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Progress value={status.progress} className="h-2" />
+              <p className="text-center text-sm text-muted-foreground">
+                {status.progress}% Complete
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div
+                className={`rounded-lg border p-4 text-center transition-all ${
+                  status.status === "processing"
+                    ? "border-primary bg-primary/5"
+                    : status.progress > 25
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-border"
+                }`}
+              >
+                <Loader2 className="mx-auto mb-2 h-6 w-6" />
+                <p className="text-sm font-medium">Processing</p>
+              </div>
+
+              <div
+                className={`rounded-lg border p-4 text-center transition-all ${
+                  status.status === "searching"
+                    ? "border-primary bg-primary/5"
+                    : status.progress > 50
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-border"
+                }`}
+              >
+                <Search className="mx-auto mb-2 h-6 w-6" />
+                <p className="text-sm font-medium">Searching</p>
+              </div>
+
+              <div
+                className={`rounded-lg border p-4 text-center transition-all ${
+                  status.status === "contacting" || status.status === "completed"
+                    ? "border-primary bg-primary/5"
+                    : "border-border"
+                }`}
+              >
+                <MessageSquare className="mx-auto mb-2 h-6 w-6" />
+                <p className="text-sm font-medium">Contacting</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-muted p-4 text-center text-sm text-muted-foreground">
+              {processingState?.cached ? (
+                "Loading reusable results. This should only take a moment."
+              ) : (
+                "New investigation in progress. The workflow searches suppliers, validates contact paths, and prepares a ranked shortlist."
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Processing;
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, Search, MessageSquare, CheckCircle2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -27,7 +246,6 @@ const Processing = () => {
     status: "processing",
     progress: 0,
     message: "Initializing AI agents...",
-    timestamp: new Date().toISOString(),
   });
 
   useEffect(() => {
@@ -43,7 +261,6 @@ const Processing = () => {
         status: "processing",
         progress: 10,
         message: "Analyzing your requirements and preparing search...",
-        timestamp: new Date().toISOString(),
       });
       return;
     }
